@@ -17,6 +17,7 @@ docker build --tag "$CONTAINER_STRING" .
 ECR_REPOSITORY_NAME="$CONTAINER_STRING"
 ECR_REPOSITORY_EXISTS=$(aws ecr describe-repositories --repository-names "$ECR_REPOSITORY_NAME" --query 'repositories' --output text)
 if [ -z "$ECR_REPOSITORY_EXISTS" ]; then
+    echo "Creating ECR repository $ECR_REPOSITORY_NAME"
     aws ecr create-repository --repository-name "$ECR_REPOSITORY_NAME"
 fi
 
