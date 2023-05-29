@@ -4,9 +4,7 @@ LABEL authors="turner"
 # copy all code and lambda handler
 COPY src/ .
 COPY lambda_handler.py ./
-# COPY config.py ./  # Uncomment if there is a config.py file
 COPY requirements.txt ./
-# COPY config.py ./
 COPY config.yaml ./
 # install packages
 RUN yum install -y gcc-c++ pkgconfig poppler-cpp-devel
