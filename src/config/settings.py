@@ -3,7 +3,8 @@ import yaml
 
 
 def unpack_yaml():
-    project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # For local
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # For lambda
     yaml_path = os.path.join(project_root, 'config.yaml')
     with open(yaml_path, 'r') as f:
         config = yaml.safe_load(f)
