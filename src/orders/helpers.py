@@ -34,8 +34,9 @@ def sales_and_payments_from_raw_order_data(data):
     orders['diningOption'] = orders['diningOption'].replace(dining_options_mapping)
 
     # Remove Deferred Orders (Gift Cards)
-    deferred_order_idx = orders.loc[orders['diningOption'].isna()]['checks'].apply(pd.Series).stack().apply(pd.Series)['selections'].apply(pd.Series).stack().apply(pd.Series)['deferred'].index.get_level_values(0)
-    orders = orders.drop(deferred_order_idx)
+    if not orders.loc[orders['diningOption'].isna()].empty:
+        deferred_order_idx = orders.loc[orders['diningOption'].isna()]['checks'].apply(pd.Series).stack().apply(pd.Series)['selections'].apply(pd.Series).stack().apply(pd.Series)['deferred'].index.get_level_values(0)
+        orders = orders.drop(deferred_order_idx)
 
     # Checks
     checks = orders['checks'].apply(pd.Series)
@@ -99,14 +100,15 @@ def sales_and_payments_from_raw_order_data(data):
     payments = payments.drop(refund_idx)
 
     # Subtract partial refunds
-    partial_refunds = payments.loc[payments['refundStatus'] == 'PARTIAL']['refund'].apply(pd.Series)[['tipRefundAmount', 'refundAmount']]
-    payments.loc[partial_refunds.index.get_level_values(0), 'tipAmount'] -= partial_refunds['tipRefundAmount']
-    payments.loc[partial_refunds.index.get_level_values(0), 'amount'] -= partial_refunds['refundAmount']
+    if not payments.loc[payments['refundStatus'] == 'PARTIAL'].empty:
+        partial_refunds = payments.loc[payments['refundStatus'] == 'PARTIAL']['refund'].apply(pd.Series)[['tipRefundAmount', 'refundAmount']]
+        payments.loc[partial_refunds.index.get_level_values(0), 'tipAmount'] -= partial_refunds['tipRefundAmount']
+        payments.loc[partial_refunds.index.get_level_values(0), 'amount'] -= partial_refunds['refundAmount']
 
     payments = pd.concat([
         payments[['originalProcessingFee', 'amount', 'tipAmount']].groupby(level=0).sum(),
         payments[['checkGuid', 'orderGuid', 'guid', 'paidBusinessDate']].groupby(level=0).head(1).droplevel(level=1)
-    ], axis=1)
+    ], axis=1, ignore_index=True)
 
     # Drop voided payments (already gone from payments)
     voided_payments_idx = set(orders.index) - set(payments.index)
@@ -158,7 +160,7 @@ def sales_and_payments_from_raw_order_data(data):
     # Trim to relevant columns
     mods = mods[['preDiscountPrice', 'displayName', 'quantity']]
     # Return the modifiers to a list of concise dictionaries
-    mods = mods.apply(dict, axis=1).unstack().apply(lambda x: [val for val in x if val is not None], axis=1)
+    mods = mods.apply(dict, axis=1).unstack().apply(lambda x: [val for val in x if not pd.isnull(val)], axis=1)
 
     # Add mods back to their selection, fill nulls with [] and dump to json
     selections['modifiers'] = mods
