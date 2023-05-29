@@ -6,7 +6,7 @@ import pandas as pd
 from aws_helpers.dynamodb import get_entire_table
 
 
-def time_entries_and_start_dates_from_labor_data(data):
+def time_entries_and_start_dates_from_labor_data(data, start_dates=None):
     labor = pd.DataFrame(data)
 
     # Remove deleted
@@ -50,12 +50,26 @@ def time_entries_and_start_dates_from_labor_data(data):
     # Business date integer to datetime
     labor['businessDate'] = pd.to_datetime(labor['businessDate'], format='%Y%m%d')
 
-    # Get start dates for each employee
-    start_dates = labor[
-        ['employeeGuid', 'businessDate']
-    ].groupby('employeeGuid').min().reset_index().rename(
-        columns={'businessDate': 'startDate'}
-    )
+    if start_dates is None:
+        # Get start dates for each employee
+        start_dates = labor[
+            ['employeeGuid', 'businessDate']
+        ].groupby('employeeGuid').min().reset_index().rename(
+            columns={'businessDate': 'startDate'}
+        )
+    else:
+        start_dates['startDate'] = pd.to_datetime(start_dates['startDate'], format='%Y-%m-%d')
+
+    if (~labor['employeeGuid'].isin(start_dates['employeeGuid'].unique())).any():
+        # Get start dates for each employee, not already in the table
+        new_start_dates = labor.loc[
+            ~labor['employeeGuid'].isin(start_dates['employeeGuid'].unique())
+        ][
+            ['employeeGuid', 'businessDate']
+        ].groupby('employeeGuid').min().reset_index().rename(
+            columns={'businessDate': 'startDate'}
+        )
+        start_dates = pd.concat([start_dates, new_start_dates], axis=0, ignore_index=True)
 
     # Get start dates for each employee
     labor = labor.merge(
