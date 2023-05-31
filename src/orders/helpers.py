@@ -108,7 +108,7 @@ def sales_and_payments_from_raw_order_data(data):
     payments = pd.concat([
         payments[['originalProcessingFee', 'amount', 'tipAmount']].groupby(level=0).sum(),
         payments[['checkGuid', 'orderGuid', 'guid', 'paidBusinessDate']].groupby(level=0).head(1).droplevel(level=1)
-    ], axis=1, ignore_index=True)
+    ], axis=1)
 
     # Drop voided payments (already gone from payments)
     voided_payments_idx = set(orders.index) - set(payments.index)
@@ -151,21 +151,25 @@ def sales_and_payments_from_raw_order_data(data):
     mods = selections['modifiers'].apply(pd.Series).stack().apply(pd.Series)
 
     # Sanity checks
-    assert (~mods['deferred']).all(), 'Deferred modifiers'
-    assert mods['voidReason'].isna().all(), 'Voided Modifiers'
-    assert (~mods['voided']).all(), 'Voided modifiers'
-    assert (~mods['modifiers'].astype(bool)).all(), 'Modified modifiers'
-    # Remove request messages
-    mods = mods.loc[mods['selectionType'] != 'SPECIAL_REQUEST']
-    # Trim to relevant columns
-    mods = mods[['preDiscountPrice', 'displayName', 'quantity']]
-    # Return the modifiers to a list of concise dictionaries
-    mods = mods.apply(dict, axis=1).unstack().apply(lambda x: [val for val in x if not pd.isnull(val)], axis=1)
+    if not mods.empty:
+        assert (~mods['deferred']).all(), 'Deferred modifiers'
+        assert mods['voidReason'].isna().all(), 'Voided Modifiers'
+        assert (~mods['voided']).all(), 'Voided modifiers'
+        assert (~mods['modifiers'].astype(bool)).all(), 'Modified modifiers'
 
-    # Add mods back to their selection, fill nulls with [] and dump to json
-    selections['modifiers'] = mods
-    selections['modifiers'] = selections['modifiers'].apply(lambda d: d if isinstance(d, list) else [])
-    selections['modifiers'] = selections['modifiers'].apply(lambda x: json.dumps(x, cls=DecimalEncoder))
+        # Remove request messages
+        mods = mods.loc[mods['selectionType'] != 'SPECIAL_REQUEST']
+        # Trim to relevant columns
+        mods = mods[['preDiscountPrice', 'displayName', 'quantity']]
+        # Return the modifiers to a list of concise dictionaries
+        mods = mods.apply(dict, axis=1).unstack().apply(lambda x: [val for val in x if not pd.isnull(val)], axis=1)
+
+        # Add mods back to their selection, fill nulls with [] and dump to json
+        selections['modifiers'] = mods
+        selections['modifiers'] = selections['modifiers'].apply(lambda d: d if isinstance(d, list) else [])
+        selections['modifiers'] = selections['modifiers'].apply(lambda x: json.dumps(x, cls=DecimalEncoder))
+    else:
+        selections['modifiers'] = selections['modifiers'].apply(lambda x: json.dumps([], cls=DecimalEncoder))
 
     # Merge selections and modifiers
     sales = selections.reset_index().merge(
