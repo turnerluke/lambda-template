@@ -41,22 +41,20 @@ def write_to_s3(bucket_name, file_name, data):
     s3.put_object(Body=data, Bucket=bucket_name, Key=file_name)
 
 
-def save_df_as_csv(df, bucket_name, csv_path):
-    """
-    Save a Pandas DataFrame as a CSV file in S3.
-    :param df: Pandas DataFrame
-    :param bucket_name: S3 bucket name
-    :param csv_path: S3 path to the CSV file
-    :return:
-    """
-    # Save the DataFrame as a local CSV file
-    local_csv_path = 'temp.csv'
-    df.to_csv(local_csv_path, index=False)
+def save_df_as_csv(df, bucket_name, file_key):
+    # Convert dataframe to CSV string
+    csv_buffer = io.StringIO()
+    df.to_csv(csv_buffer, index=False)
 
-    # Upload the local CSV file to S3
-    s3.upload_file(local_csv_path, bucket_name, csv_path)
+    # Save the CSV string to S3 bucket
+    response = s3.put_object(
+        Body=csv_buffer.getvalue(),
+        Bucket=bucket_name,
+        Key=file_key
+    )
 
-    os.remove(local_csv_path)
+    # Check if the file was successfully saved
+    assert response['ResponseMetadata']['HTTPStatusCode'] == 200, "File was not successfully saved to S3"
 
 
 def get_csv_as_df(bucket_name, csv_path):
