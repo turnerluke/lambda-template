@@ -16,11 +16,24 @@ boto3.resource('dynamodb')
 deserializer = boto3.dynamodb.types.TypeDeserializer()
 
 
+def remove_duplicates(lst: list[dict]) -> list[dict]:
+    """Removes duplicate dictionaries from a list of dictionaries."""
+    seen = set()
+    new_lst = []
+    for d in lst:
+        key = d['guid']
+        if key not in seen:
+            seen.add(key)
+            new_lst.append(d)
+    return new_lst
+
+
 def handler(event, context):
     try:
-        event_txt = json.dumps(event, sort_keys=True, indent=4)
-        send_message_to_slack_channel(event_txt)
+        msg = '=' * 50 + '\n'
         table_name = event['Records'][0]['eventSourceARN'].split('/')[1]
+        print(table_name)
+        msg += f"DynamoDB Table Update: {table_name}\n"
 
         new_data = []
 
@@ -40,6 +53,9 @@ def handler(event, context):
                 new_record = {k: deserializer.deserialize(v) for k, v in new_record.items()}
                 new_data.append(new_record)
 
+        # Remove duplicates
+        new_data = remove_duplicates(new_data)
+
         if table_name == 'orders':
             sales = get_csv_as_df(config.settings.S3_BUCKET, 'sales.csv')
             payments = get_csv_as_df(config.settings.S3_BUCKET, 'payments.csv')
@@ -57,8 +73,8 @@ def handler(event, context):
             sales = pd.concat([sales, new_sales], axis=0, ignore_index=True)
             sales['businessDate'] = pd.to_datetime(sales['businessDate']).dt.date
 
-            send_message_to_slack_channel(f"Rows dropped in sales table: {dropped_rows}")
-            send_message_to_slack_channel(f"Rows added to sales table: {new_rows}")
+            msg += f"Rows dropped in sales table: {dropped_rows}\n"
+            msg += f"Rows added to sales table: {new_rows}\n"
 
             # Process payments
             start_num_rows = len(payments)
@@ -72,16 +88,16 @@ def handler(event, context):
             # Append new data
             payments = pd.concat([payments, new_payments], axis=0, ignore_index=True)
 
-            send_message_to_slack_channel(f"Rows dropped in payments table: {dropped_rows}")
-            send_message_to_slack_channel(f"Rows added to payments table: {new_rows}")
+            msg += f"Rows dropped in payments table: {dropped_rows}\n"
+            msg += f"Rows added to payments table: {new_rows}\n"
 
             # Save to S3
             save_df_as_csv(sales, config.settings.S3_BUCKET, 'sales.csv')
             save_df_as_csv(payments, config.settings.S3_BUCKET, 'payments.csv')
 
         elif table_name == 'labor':
-            time_entries = get_csv_as_df(config.settings.S3_BUCKET, 'time_entries.csv')
-            start_dates = get_csv_as_df(config.settings.S3_BUCKET, 'start_dates.csv')
+            time_entries = get_csv_as_df(config.settings.S3_BUCKET, 'time-entries.csv')
+            start_dates = get_csv_as_df(config.settings.S3_BUCKET, 'start-dates.csv')
             new_time_entries, new_start_dates = time_entries_and_start_dates_from_labor_data(new_data, start_dates)
 
             # Process time entries
@@ -97,21 +113,28 @@ def handler(event, context):
             time_entries = pd.concat([time_entries, new_time_entries], axis=0, ignore_index=True)
             time_entries['businessDate'] = pd.to_datetime(time_entries['businessDate']).dt.date
 
-            send_message_to_slack_channel(f"Rows dropped in time entries table: {dropped_rows}")
-            send_message_to_slack_channel(f"Rows added to time entries table: {new_rows}")
+            msg += f"Rows dropped in time entries table: {dropped_rows}\n"
+            msg += f"Rows added to time entries table: {new_rows}\n"
 
             # Process start dates
             start_entries = len(start_dates)
             end_entries = len(new_start_dates)
-            send_message_to_slack_channel(f"Rows added to start-dates table: {end_entries - start_entries}")
+            msg += f"Rows added to start-dates table: {end_entries - start_entries}\n"
 
             # Save to S3
             save_df_as_csv(time_entries, config.settings.S3_BUCKET, 'time-entries.csv')
-            save_df_as_csv(start_dates, config.settings.S3_BUCKET, 'start_dates.csv')
+            save_df_as_csv(start_dates, config.settings.S3_BUCKET, 'start-dates.csv')
+        else:
+            raise ValueError(f"Table name {table_name} not recognized.")
+
+        msg += '=' * 50
+        send_message_to_slack_channel(msg)
+        print(msg)
 
     except Exception as e:
         send_message_to_slack_channel(
             f"<@U0470Q1MJM8>\nError occurred:\n```{e}```\nTraceback:\n```{traceback.format_exc()}```"
         )
+        print(f"<@U0470Q1MJM8>\nError occurred:\n```{e}```\nTraceback:\n```{traceback.format_exc()}```")
         raise e
 
