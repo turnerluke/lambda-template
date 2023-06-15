@@ -1,3 +1,7 @@
+#!/bin/bash
+
+
+# Set variables
 URL_STRING=".dkr.ecr.us-east-1.amazonaws.com"
 CONTAINER_STRING=$(basename "$(pwd)")
 IMAGE_STRING="latest"
@@ -12,6 +16,16 @@ docker rmi "$AWS_ACCOUNT_ID$URL_STRING/$CONTAINER_STRING" "$CONTAINER_STRING"
 
 # Build image
 docker build --tag "$CONTAINER_STRING" .
+
+# Run the Docker image locally
+docker run -d --name "$CONTAINER_STRING" "$CONTAINER_STRING"
+
+# Execute tests against the running container
+docker exec "$CONTAINER_STRING" python -m pytest
+
+# Stop and remove the local container
+docker stop "$CONTAINER_STRING"
+docker rm "$CONTAINER_STRING"
 
 # Check if ECR repository exists, create if it doesn't
 ECR_REPOSITORY_NAME="$CONTAINER_STRING"
