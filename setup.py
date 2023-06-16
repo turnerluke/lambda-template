@@ -1,11 +1,11 @@
 from setuptools import setup, find_packages
 setup(
-    name='ziki-dbd-streams',
+    name='lambda-template',
     version='0.0',
     author='Turner Luke',
     author_email='turnermluke@gmail.com',
-    description='Data pipelines for ZIKI',
-    url='https://github.com/turnerluke/ziki-dbd-streams',
+    description='A template for AWS Lambda functions.',
+    url='https://github.com/turnerluke/lambda-template',
     packages=find_packages('src'),
     package_dir={'': 'src'},
     extras_require=dict(tests=['pytest']),
