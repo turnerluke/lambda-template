@@ -8,6 +8,9 @@ IMAGE_STRING="latest"
 ECR_IMAGE_URI="$AWS_ACCOUNT_ID$URL_STRING/$CONTAINER_STRING:$IMAGE_STRING"
 LAMBDA_EXECUTION_ROLE_ARN="arn:aws:iam::591851667748:role/lambda_basic_execution"
 
+# Update submodules
+git submodule update --remote --merge
+
 # Log in to ECR
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin "$AWS_ACCOUNT_ID$URL_STRING"
 
@@ -44,7 +47,7 @@ LAMBDA_FUNCTION_NAME="$CONTAINER_STRING"
 LAMBDA_FUNCTION_EXISTS=$(aws lambda list-functions --query "Functions[?FunctionName=='$LAMBDA_FUNCTION_NAME'].FunctionName" --output text)
 if [ -z "$LAMBDA_FUNCTION_EXISTS" ]; then
     echo "Creating Lambda function $LAMBDA_FUNCTION_NAME"
-    aws lambda create-function --function-name "$LAMBDA_FUNCTION_NAME" --code "ImageUri=$ECR_IMAGE_URI" --role "$LAMBDA_EXECUTION_ROLE_ARN" --package-type Image
+    aws lambda create-function --function-name "$LAMBDA_FUNCTION_NAME" --code "ImageUri=$ECR_IMAGE_URI" --role "$LAMBDA_EXECUTION_ROLE_ARN" --package-type Image --timeout 900 --memory-size 2048
 else
     echo "Updating Lambda function $LAMBDA_FUNCTION_NAME"
     aws lambda update-function-code --function-name "$LAMBDA_FUNCTION_NAME" --image "$ECR_IMAGE_URI"
